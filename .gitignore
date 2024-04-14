@@ -66,3 +66,6 @@ node_modules/
 .env
 
 ToIg
+toIgnore/
+
+functions/.runtimeconfig.json
