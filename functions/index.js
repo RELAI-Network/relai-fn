@@ -1,19 +1,21 @@
 const { onRequest } = require("firebase-functions/v2/https");
 const functions = require('firebase-functions');
+const { FieldValue } = require('firebase-admin/firestore');
+
 const admin = require("firebase-admin");
 const crypto = require('crypto');
-const crustPin = require('@crustio/crust-pin').default;
 const { ApiPromise, WsProvider } = require('@polkadot/api');
 const { Keyring } = require('@polkadot/keyring');
 
 
-const C_ACCOUNT_SEEDS = process.env.crust_seed;
-const CW3AUTH = process.env.crust_auth
-const RL_FAUCET_SEED = process.env.rl_faucet_seed;
+//const crustPin = require('@crustio/crust-pin').default;
+//const C_ACCOUNT_SEEDS = functions.config().config.crust_seed;
+//const crust = new crustPin(`${C_ACCOUNT_SEEDS}`);
 
+const CW3AUTH = functions.config().config.crust_auth;
+const RL_FAUCET_SEED = functions.config().config.rl_faucet_seed;
 const RL_Amount = 20_000_000_000;
 
-const crust = new crustPin(`${C_ACCOUNT_SEEDS}`);
 
 admin.initializeApp();
 
@@ -94,11 +96,9 @@ exports.onScanDone = functions.firestore
     .document('/apps_scans/{docId}')
     .onCreate(async (snap, context) => {
         const data = snap.data();
-
         // Specify the bucket name and file name
         const bucketName = 'future-console.appspot.com';
         const fileName = `developers/${data.developer_id}/apps/${data.application_id}/releases/${data.app_name}`;
-
 
         // Get the file from Cloud Storage
         const bucket = storage.bucket(bucketName);
@@ -161,25 +161,25 @@ exports.onScanDone = functions.firestore
         return Promise.resolve();
     });
 
-
 exports.reviews = onRequest(
     async (req, res) => {
         try {
-   
+
             const docRef = admin.firestore().collection('reviews').doc('queue');
             const doc = await docRef.get();
-    
+
             if (!doc.exists) {
                 res.status(404).send('Document not found');
                 return;
             }
-    
+
             const data = doc.data();
-    
+
             res.status(200).send({
                 reviews: data.list
             });
-    
+
+
         } catch (err) {
             console.error(err);
             res.status(500).send('Error fetching document');
@@ -187,6 +187,31 @@ exports.reviews = onRequest(
     }
 );
 
+exports.clearReviews = onRequest(
+    async (req, res) => {
+        try {
+
+            const docRef = admin.firestore().collection('reviews').doc('queue');
+
+            const doc = await docRef.get();
+
+            if (!doc.exists) {
+                res.status(404).send('Document not found');
+                return;
+            }
+
+            await docRef.update({
+                list: FieldValue.delete()
+            });
+
+            res.status(200).send("Reviews Cleared");
+        
+        } catch (err) {
+            console.error(err);
+            res.status(500).send('Error fetching document');
+        }
+    }
+);
 
 exports.faucet = onRequest(
     async (req, res) => {
@@ -204,7 +229,7 @@ exports.faucet = onRequest(
             const api = await ApiPromise.create({ provider: wsProvider });
 
             const keyring = new Keyring({ type: 'sr25519' });
-            const mnemonic = RL_FAUCET_SEED; 
+            const mnemonic = RL_FAUCET_SEED;
             const account = keyring.addFromMnemonic(mnemonic);
             const txHash = await api.tx.balances
                 .transfer(requester, RL_Amount)
@@ -221,3 +246,11 @@ exports.faucet = onRequest(
         }
     }
 );
+
+
+// 🚧 🚧 🚧 Tests
+//const { testFaucet, testOnScanDone, testReviews, testClearReviews } = require("../functions/test-functions");
+//exports.testFaucet = testFaucet;
+//exports.testOnScanDone = testOnScanDone
+//exports.testReviews = testReviews;
+//exports.testClearReviews = testClearReviews;
